@@ -20,8 +20,8 @@ export function Navbar() {
   const user = null as { name: string; role: string } | null;
 
   return (
-    <nav className="relative z-20 w-full border-b border-card-border bg-background/85 backdrop-blur-xl">
-      <div className="w-full px-4 sm:px-6 lg:px-8">
+    <nav className="relative z-20 border-b border-card-border bg-background/85 backdrop-blur-xl">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
           {/* Brand */}
           <Link href="/" className="flex items-center gap-3">
