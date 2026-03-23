@@ -32,13 +32,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" className="w-full">
       <body
-        className={`${inter.variable} ${syne.variable} font-sans antialiased`}
+        className={`${inter.variable} ${syne.variable} font-sans antialiased w-full min-w-full`}
       >
-        <Navbar />
-        <main className="relative z-10 page-enter">{children}</main>
-        <Footer />
+        <div className="flex min-h-screen w-full flex-col">
+          <Navbar />
+          <main className="relative z-10 flex-1 w-full page-enter">{children}</main>
+          <Footer />
+        </div>
       </body>
     </html>
   );
