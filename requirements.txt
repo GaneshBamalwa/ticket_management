@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+jinja2
+starlette-session-middleware
+aiofiles
+python-multipart
+mysql-connector-python
+python-dotenv
+pycryptodome
