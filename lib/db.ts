@@ -1,102 +1,70 @@
-import Database from "better-sqlite3";
-import bcrypt from "bcryptjs";
-import path from "path";
+// In-memory data store for demo purposes
+// Replace with a real database integration (Supabase, Neon, etc.) for production
 
-const DB_PATH = path.join(process.cwd(), "support_portal.db");
-
-let db: Database.Database | null = null;
-
-export function getDb() {
-  if (!db) {
-    db = new Database(DB_PATH);
-    db.pragma("journal_mode = WAL");
-    initDb();
-  }
-  return db;
+export interface Customer {
+  Customer_ID: number;
+  Name: string;
+  Email_ID: string;
 }
 
-function initDb() {
-  const database = getDb();
-
-  // Create tables
-  database.exec(`
-    CREATE TABLE IF NOT EXISTS Customers (
-      Customer_ID INTEGER PRIMARY KEY AUTOINCREMENT,
-      Name TEXT,
-      Email_ID TEXT UNIQUE
-    );
-
-    CREATE TABLE IF NOT EXISTS Support_Agents (
-      Agent_ID INTEGER PRIMARY KEY AUTOINCREMENT,
-      Name TEXT,
-      Email_ID TEXT UNIQUE,
-      Role TEXT,
-      Password TEXT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS Tickets (
-      Ticket_ID INTEGER PRIMARY KEY AUTOINCREMENT,
-      Customer_ID INTEGER,
-      Agent_ID INTEGER NULL,
-      Subject TEXT,
-      Description TEXT,
-      Status TEXT DEFAULT 'Open',
-      Priority TEXT,
-      FollowUpCount INTEGER DEFAULT 0,
-      Rating INTEGER NULL,
-      Created_Date DATETIME DEFAULT CURRENT_TIMESTAMP,
-      Assigned_At DATETIME NULL,
-      Resolved_At DATETIME NULL,
-      Due_Date DATETIME NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS Ticket_Conversations (
-      Message_ID INTEGER PRIMARY KEY AUTOINCREMENT,
-      Ticket_ID INTEGER,
-      Sender_Role TEXT,
-      Message_Text TEXT,
-      Timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS Password_Change_Requests (
-      Request_ID INTEGER PRIMARY KEY AUTOINCREMENT,
-      Agent_ID INTEGER,
-      Status TEXT DEFAULT 'Pending',
-      Requested_At DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-  `);
-
-  // Seed initial agents
-  const agents = [
-    { name: "Admin", email: "admin@support.com", role: "Administrator", password: "admin1234" },
-    { name: "Ganesh", email: "ganesh@support.com", role: "Agent", password: "ganesh123" },
-    { name: "Rudransh", email: "rudransh@support.com", role: "Agent", password: "rudransh123" },
-  ];
-
-  const checkStmt = database.prepare("SELECT Agent_ID FROM Support_Agents WHERE Email_ID = ?");
-  const insertStmt = database.prepare(
-    "INSERT INTO Support_Agents (Name, Email_ID, Role, Password) VALUES (?, ?, ?, ?)"
-  );
-
-  for (const agent of agents) {
-    const existing = checkStmt.get(agent.email);
-    if (!existing) {
-      const hashedPassword = bcrypt.hashSync(agent.password, 10);
-      insertStmt.run(agent.name, agent.email, agent.role, hashedPassword);
-    }
-  }
+export interface Ticket {
+  Ticket_ID: number;
+  Customer_ID: number;
+  Agent_ID: number | null;
+  Subject: string;
+  Description: string;
+  Status: string;
+  Priority: string;
+  FollowUpCount: number;
+  Rating: number | null;
+  Created_Date: string;
+  Assigned_At: string | null;
+  Resolved_At: string | null;
+  Due_Date: string | null;
 }
 
-// Export helper functions
-export function getCustomerByEmail(email: string) {
-  const db = getDb();
-  return db.prepare("SELECT * FROM Customers WHERE Email_ID = ?").get(email);
+export interface Conversation {
+  Message_ID: number;
+  Ticket_ID: number;
+  Sender_Role: string;
+  Message_Text: string;
+  Timestamp: string;
 }
 
-export function createCustomer(name: string, email: string) {
-  const db = getDb();
-  const result = db.prepare("INSERT INTO Customers (Name, Email_ID) VALUES (?, ?)").run(name, email);
-  return result.lastInsertRowid;
+export interface Agent {
+  Agent_ID: number;
+  Name: string;
+  Email_ID: string;
+  Role: string;
+  Password: string;
+}
+
+// In-memory data stores
+const customers: Customer[] = [];
+const tickets: Ticket[] = [];
+const conversations: Conversation[] = [];
+const agents: Agent[] = [
+  { Agent_ID: 1, Name: "Admin", Email_ID: "admin@support.com", Role: "Administrator", Password: "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZRGdjGj/n3.S3ksWQhWZYz0aSrp7S" }, // admin1234
+  { Agent_ID: 2, Name: "Ganesh", Email_ID: "ganesh@support.com", Role: "Agent", Password: "$2a$10$YJPJwgqPX8qPwpOQk2jVq.KBsGxIH3qwOz8xVOoQHOEh8g4IzVVHm" }, // ganesh123
+  { Agent_ID: 3, Name: "Rudransh", Email_ID: "rudransh@support.com", Role: "Agent", Password: "$2a$10$rNbWLWR4VLmCqnpLeqVW3.U4hVuGpKi0HY0JqK8wJW5qYOZOJKrQK" }, // rudransh123
+];
+
+let customerIdCounter = 1;
+let ticketIdCounter = 1;
+let conversationIdCounter = 1;
+
+export function getCustomerByEmail(email: string): Customer | undefined {
+  return customers.find((c) => c.Email_ID === email);
+}
+
+export function createCustomer(name: string, email: string): number {
+  const customer: Customer = {
+    Customer_ID: customerIdCounter++,
+    Name: name,
+    Email_ID: email,
+  };
+  customers.push(customer);
+  return customer.Customer_ID;
 }
 
 export function createTicket(
@@ -104,57 +72,76 @@ export function createTicket(
   subject: string,
   description: string,
   priority: string
-) {
-  const db = getDb();
-  const result = db
-    .prepare(
-      "INSERT INTO Tickets (Customer_ID, Subject, Description, Priority, Status) VALUES (?, ?, ?, ?, 'Open')"
-    )
-    .run(customerId, subject, description, priority);
-  return result.lastInsertRowid;
+): number {
+  const ticket: Ticket = {
+    Ticket_ID: ticketIdCounter++,
+    Customer_ID: customerId,
+    Agent_ID: null,
+    Subject: subject,
+    Description: description,
+    Status: "Open",
+    Priority: priority,
+    FollowUpCount: 0,
+    Rating: null,
+    Created_Date: new Date().toISOString(),
+    Assigned_At: null,
+    Resolved_At: null,
+    Due_Date: null,
+  };
+  tickets.push(ticket);
+  return ticket.Ticket_ID;
 }
 
-export function getTicketsByCustomerId(customerId: number) {
-  const db = getDb();
-  return db
-    .prepare("SELECT * FROM Tickets WHERE Customer_ID = ? ORDER BY Ticket_ID DESC")
-    .all(customerId);
+export function getTicketsByCustomerId(customerId: number): Ticket[] {
+  return tickets
+    .filter((t) => t.Customer_ID === customerId)
+    .sort((a, b) => b.Ticket_ID - a.Ticket_ID);
 }
 
-export function getTicketById(ticketId: number) {
-  const db = getDb();
-  return db.prepare("SELECT * FROM Tickets WHERE Ticket_ID = ?").get(ticketId);
+export function getTicketById(ticketId: number): Ticket | undefined {
+  return tickets.find((t) => t.Ticket_ID === ticketId);
 }
 
-export function getConversationsByTicketId(ticketId: number) {
-  const db = getDb();
-  return db
-    .prepare("SELECT * FROM Ticket_Conversations WHERE Ticket_ID = ? ORDER BY Timestamp ASC")
-    .all(ticketId);
+export function getConversationsByTicketId(ticketId: number): Conversation[] {
+  return conversations
+    .filter((c) => c.Ticket_ID === ticketId)
+    .sort((a, b) => new Date(a.Timestamp).getTime() - new Date(b.Timestamp).getTime());
 }
 
-export function addConversationMessage(ticketId: number, senderRole: string, message: string) {
-  const db = getDb();
-  return db
-    .prepare(
-      "INSERT INTO Ticket_Conversations (Ticket_ID, Sender_Role, Message_Text) VALUES (?, ?, ?)"
-    )
-    .run(ticketId, senderRole, message);
-}
+export function addConversationMessage(
+  ticketId: number,
+  senderRole: string,
+  message: string
+): void {
+  const conversation: Conversation = {
+    Message_ID: conversationIdCounter++,
+    Ticket_ID: ticketId,
+    Sender_Role: senderRole,
+    Message_Text: message,
+    Timestamp: new Date().toISOString(),
+  };
+  conversations.push(conversation);
 
-export function getAgentByEmail(email: string) {
-  const db = getDb();
-  return db.prepare("SELECT * FROM Support_Agents WHERE Email_ID = ?").get(email);
-}
-
-export function getAllTickets(agentId?: number, role?: string) {
-  const db = getDb();
-  if (role === "Administrator") {
-    return db.prepare("SELECT * FROM Tickets ORDER BY FollowUpCount DESC, Ticket_ID DESC").all();
+  // Increment follow-up count on ticket
+  const ticket = tickets.find((t) => t.Ticket_ID === ticketId);
+  if (ticket) {
+    ticket.FollowUpCount++;
   }
-  return db
-    .prepare(
-      "SELECT * FROM Tickets WHERE Agent_ID = ? OR Agent_ID IS NULL ORDER BY FollowUpCount DESC, Ticket_ID DESC"
-    )
-    .all(agentId);
+}
+
+export function getAgentByEmail(email: string): Agent | undefined {
+  return agents.find((a) => a.Email_ID === email);
+}
+
+export function getAllTickets(agentId?: number, role?: string): Ticket[] {
+  if (role === "Administrator") {
+    return [...tickets].sort((a, b) => b.FollowUpCount - a.FollowUpCount || b.Ticket_ID - a.Ticket_ID);
+  }
+  return tickets
+    .filter((t) => t.Agent_ID === agentId || t.Agent_ID === null)
+    .sort((a, b) => b.FollowUpCount - a.FollowUpCount || b.Ticket_ID - a.Ticket_ID);
+}
+
+export function getCustomerById(customerId: number): Customer | undefined {
+  return customers.find((c) => c.Customer_ID === customerId);
 }
